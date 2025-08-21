@@ -11,7 +11,7 @@ import SwiftUI
 
 class HealthKitManager: ObservableObject {
     private var healthStore = HKHealthStore()
-//    private var activeObserverQueries: [HKObserverQuery] = []
+    private var activeObserverQueries: [HKObserverQuery] = []
     @Published var authorizationStatus: HKAuthorizationStatus = .notDetermined
     @Published var stepCount: Int = 0
     @Published var caloriesBurned: Double = 0
@@ -29,136 +29,110 @@ class HealthKitManager: ObservableObject {
     @Published var userGender: HKBiologicalSex = .notSet
     
     // UserDefaults keys for persistent storage
-//    private let authorizationKey = "HealthKitAuthorized"
-//    private let authorizationGrantedKey = "HealthKitAuthorizationGranted"
-//    private let anchorKeySteps = "HKAnchor_StepCount"
-//    private let anchorKeyDistance = "HKAnchor_DistanceWalkingRunning"
-//    private let anchorKeyWeight = "HKAnchor_BodyMass"
-//    private let anchorKeyHeight = "HKAnchor_Height"
+    private let authorizationKey = "HealthKitAuthorized"
+    private let authorizationGrantedKey = "HealthKitAuthorizationGranted"
+    private let anchorKeySteps = "HKAnchor_StepCount"
+    private let anchorKeyDistance = "HKAnchor_DistanceWalkingRunning"
+    private let anchorKeyWeight = "HKAnchor_BodyMass"
+    private let anchorKeyHeight = "HKAnchor_Height"
     
     init() {
-//        loadPersistedAuthorizationStatus()
-        setupHealthStoreObserver()
+        loadPersistedAuthorizationStatus()
     }
-    private func setupHealthStoreObserver() {
-        // Quan sát thay đổi authorization status
-        NotificationCenter.default.addObserver(
-            forName: .HKUserPreferencesDidChange,
-            object: healthStore,
-            queue: .main
-        ) { [weak self] _ in
-            self?.checkAuthorizationStatus()
+    
+    // MARK: - Authorization
+    func loadPersistedAuthorizationStatus() {
+        guard HKHealthStore.isHealthDataAvailable() else {
+            DispatchQueue.main.async {
+                self.errorMessage = "HealthKit is not available on this device"
+                self.isAuthorized = false
+                self.needsAuthorization = false
+            }
+            return
         }
-    }
-    func checkAuthorizationStatus() {
-        guard let stepType = HKQuantityType.quantityType(forIdentifier: .stepCount) else { return }
         
-        let status = healthStore.authorizationStatus(for: stepType)
+        // Load persisted authorization status
+        let hasAttemptedAuth = UserDefaults.standard.bool(forKey: authorizationKey)
+        let wasGranted = UserDefaults.standard.bool(forKey: authorizationGrantedKey)
+        
         DispatchQueue.main.async {
-            self.authorizationStatus = status
-            // Thử fetch dữ liệu ngay cả khi status là .sharingDenied
-            // vì HealthKit có thể trả về .sharingDenied nhưng vẫn cho phép đọc dữ liệu
-            if status == .sharingAuthorized {
-                self.fetchStepCount()
-            } else if status == .sharingDenied {
-                // Thử fetch để kiểm tra xem thực sự có quyền hay không
-//                self.fetchStepCountToVerifyPermission()
+            if wasGranted {
+                // User previously granted authorization
+                self.isAuthorized = true
+                self.needsAuthorization = false
+                self.errorMessage = nil
+                print("Loading with persisted authorization: granted")
+                self.loadUserProfile()
+                self.fetchTodaysData()
+                self.fetchWeeklySteps()
+                self.startObservingHealthKitChanges()
+            } else if hasAttemptedAuth {
+                // User was asked before but didn't grant or denied
+                self.isAuthorized = false
+                self.needsAuthorization = false
+                self.errorMessage = "Health access is required. Please enable in Settings > Privacy & Security > Health."
+                print("Loading with persisted authorization: denied/not granted")
+            } else {
+                // First time user - show authorization request
+                self.isAuthorized = false
+                self.needsAuthorization = true
+                self.errorMessage = nil
+                print("Loading as first-time user - will show authorization request")
             }
         }
     }
-    // MARK: - Authorization
-//    func loadPersistedAuthorizationStatus() {
-//        guard HKHealthStore.isHealthDataAvailable() else {
-//            DispatchQueue.main.async {
-//                self.errorMessage = "HealthKit is not available on this device"
-//                self.isAuthorized = false
-//                self.needsAuthorization = false
-//            }
-//            return
-//        }
-//        
-//        // Load persisted authorization status
-//        let hasAttemptedAuth = UserDefaults.standard.bool(forKey: authorizationKey)
-//        let wasGranted = UserDefaults.standard.bool(forKey: authorizationGrantedKey)
-//        
-//        DispatchQueue.main.async {
-//            if wasGranted {
-//                // User previously granted authorization
-//                self.isAuthorized = true
-//                self.needsAuthorization = false
-//                self.errorMessage = nil
-//                print("Loading with persisted authorization: granted")
-//                self.loadUserProfile()
-//                self.fetchTodaysData()
-//                self.fetchWeeklySteps()
-//                self.startObservingHealthKitChanges()
-//            } else if hasAttemptedAuth {
-//                // User was asked before but didn't grant or denied
-//                self.isAuthorized = false
-//                self.needsAuthorization = false
-//                self.errorMessage = "Health access is required. Please enable in Settings > Privacy & Security > Health."
-//                print("Loading with persisted authorization: denied/not granted")
-//            } else {
-//                // First time user - show authorization request
-//                self.isAuthorized = false
-//                self.needsAuthorization = true
-//                self.errorMessage = nil
-//                print("Loading as first-time user - will show authorization request")
-//            }
-//        }
-//    }
     
     // Manual check for authorization status (only when user triggers it)
-//    func checkCurrentAuthorizationStatus() {
-//        guard HKHealthStore.isHealthDataAvailable() else {
-//            DispatchQueue.main.async {
-//                self.errorMessage = "HealthKit is not available on this device"
-////                self.isAuthorized = false
-//            }
-//            return
-//        }
-//        
-//        let stepCountType = HKObjectType.quantityType(forIdentifier: .stepCount)!
-//        let authStatus = healthStore.authorizationStatus(for: stepCountType)
-//        
-//        DispatchQueue.main.async {
-//            switch authStatus {
-//            case .sharingAuthorized:
-////                self.isAuthorized = true
-////                self.needsAuthorization = false
-//                self.errorMessage = nil
-////                UserDefaults.standard.set(true, forKey: self.authorizationKey)
-////                UserDefaults.standard.set(true, forKey: self.authorizationGrantedKey)
-//                print("Manual check: authorization granted")
-//                self.loadUserProfile()
-//                self.fetchTodaysData()
-//                self.fetchWeeklySteps()
-//                self.startObservingHealthKitChanges()
-//            case .sharingDenied:
-////                self.isAuthorized = false
-////                self.needsAuthorization = false
-////                UserDefaults.standard.set(true, forKey: self.authorizationKey)
-////                UserDefaults.standard.set(false, forKey: self.authorizationGrantedKey)
-//                self.errorMessage = "Health access denied. Please enable in Settings > Privacy & Security > Health."
-//                print("Manual check: authorization denied")
-//            case .notDetermined:
-////                self.isAuthorized = false
-////                self.needsAuthorization = true
-//                self.errorMessage = nil
-//                print("Manual check: authorization not determined")
-//            @unknown default:
-////                self.isAuthorized = false
-////                self.needsAuthorization = false
-//                self.errorMessage = "Unknown authorization status."
-//                print("Manual check: unknown status")
-//            }
-//        }
-//    }
+    func checkCurrentAuthorizationStatus() {
+        guard HKHealthStore.isHealthDataAvailable() else {
+            DispatchQueue.main.async {
+                self.errorMessage = "HealthKit is not available on this device"
+                self.isAuthorized = false
+            }
+            return
+        }
+        
+        let stepCountType = HKObjectType.quantityType(forIdentifier: .stepCount)!
+        let authStatus = healthStore.authorizationStatus(for: stepCountType)
+        
+        DispatchQueue.main.async {
+            switch authStatus {
+            case .sharingAuthorized:
+                self.isAuthorized = true
+                self.needsAuthorization = false
+                self.errorMessage = nil
+                UserDefaults.standard.set(true, forKey: self.authorizationKey)
+                UserDefaults.standard.set(true, forKey: self.authorizationGrantedKey)
+                print("Manual check: authorization granted")
+                self.loadUserProfile()
+                self.fetchTodaysData()
+                self.fetchWeeklySteps()
+                self.startObservingHealthKitChanges()
+            case .sharingDenied:
+                self.isAuthorized = false
+                self.needsAuthorization = false
+                UserDefaults.standard.set(true, forKey: self.authorizationKey)
+                UserDefaults.standard.set(false, forKey: self.authorizationGrantedKey)
+                self.errorMessage = "Health access denied. Please enable in Settings > Privacy & Security > Health."
+                print("Manual check: authorization denied")
+            case .notDetermined:
+                self.isAuthorized = false
+                self.needsAuthorization = true
+                self.errorMessage = nil
+                print("Manual check: authorization not determined")
+            @unknown default:
+                self.isAuthorized = false
+                self.needsAuthorization = false
+                self.errorMessage = "Unknown authorization status."
+                print("Manual check: unknown status")
+            }
+        }
+    }
     
     func requestAuthorization() {
         guard HKHealthStore.isHealthDataAvailable() else {
             DispatchQueue.main.async {
-//                self.errorMessage = "HealthKit is not available on this device"
+                self.errorMessage = "HealthKit is not available on this device"
             }
             return
         }
@@ -186,54 +160,54 @@ class HealthKitManager: ObservableObject {
             
             DispatchQueue.main.async {
                 // Mark that we've attempted authorization
-//                UserDefaults.standard.set(true, forKey: self?.authorizationKey ?? "")
+                UserDefaults.standard.set(true, forKey: self?.authorizationKey ?? "")
                 
                 if success {
                     print("HealthKit authorization granted")
                     // Save the granted status
-//                    UserDefaults.standard.set(true, forKey: self?.authorizationGrantedKey ?? "")
-//                    self?.isAuthorized = true
-//                    self?.needsAuthorization = false
-//                    self?.errorMessage = nil
-//                    self?.loadUserProfile()
-//                    self?.fetchTodaysData()
-//                    self?.fetchWeeklySteps()
-//                    self?.startObservingHealthKitChanges()
+                    UserDefaults.standard.set(true, forKey: self?.authorizationGrantedKey ?? "")
+                    self?.isAuthorized = true
+                    self?.needsAuthorization = false
+                    self?.errorMessage = nil
+                    self?.loadUserProfile()
+                    self?.fetchTodaysData()
+                    self?.fetchWeeklySteps()
+                    self?.startObservingHealthKitChanges()
                 } else {
-//                    let errorMsg = error?.localizedDescription ?? "Authorization failed. Please enable Health access in Settings."
-//                    print("HealthKit authorization failed: \(errorMsg)")
+                    let errorMsg = error?.localizedDescription ?? "Authorization failed. Please enable Health access in Settings."
+                    print("HealthKit authorization failed: \(errorMsg)")
                     // Save the denied status
-//                    UserDefaults.standard.set(false, forKey: self?.authorizationGrantedKey ?? "")
-//                    self?.errorMessage = errorMsg
-//                    self?.isAuthorized = false
-//                    self?.needsAuthorization = false
+                    UserDefaults.standard.set(false, forKey: self?.authorizationGrantedKey ?? "")
+                    self?.errorMessage = errorMsg
+                    self?.isAuthorized = false
+                    self?.needsAuthorization = false
                 }
             }
         }
     }
     
     // Refresh authorization status (manual check only)
-//    func refreshAuthorizationStatus() {
-//        checkCurrentAuthorizationStatus()
-//    }
+    func refreshAuthorizationStatus() {
+        checkCurrentAuthorizationStatus()
+    }
     
     // Reset authorization status (for testing/debugging)
-//    func resetAuthorizationStatus() {
-////        UserDefaults.standard.removeObject(forKey: authorizationKey)
-////        UserDefaults.standard.removeObject(forKey: authorizationGrantedKey)
-//        // Clear stored anchors and stop observers
-////        UserDefaults.standard.removeObject(forKey: anchorKeySteps)
-////        UserDefaults.standard.removeObject(forKey: anchorKeyDistance)
-////        UserDefaults.standard.removeObject(forKey: anchorKeyWeight)
-////        UserDefaults.standard.removeObject(forKey: anchorKeyHeight)
-//        stopObservingHealthKitChanges()
-//        DispatchQueue.main.async {
-//            self.isAuthorized = false
-//            self.needsAuthorization = true
-//            self.errorMessage = nil
-//            print("Authorization status reset - will show authorization request on next launch")
-//        }
-//    }
+    func resetAuthorizationStatus() {
+        UserDefaults.standard.removeObject(forKey: authorizationKey)
+        UserDefaults.standard.removeObject(forKey: authorizationGrantedKey)
+        // Clear stored anchors and stop observers
+        UserDefaults.standard.removeObject(forKey: anchorKeySteps)
+        UserDefaults.standard.removeObject(forKey: anchorKeyDistance)
+        UserDefaults.standard.removeObject(forKey: anchorKeyWeight)
+        UserDefaults.standard.removeObject(forKey: anchorKeyHeight)
+        stopObservingHealthKitChanges()
+        DispatchQueue.main.async {
+            self.isAuthorized = false
+            self.needsAuthorization = true
+            self.errorMessage = nil
+            print("Authorization status reset - will show authorization request on next launch")
+        }
+    }
     
     // MARK: - User Profile
     private func loadUserProfile() {
@@ -298,24 +272,24 @@ class HealthKitManager: ObservableObject {
     }
     
     // MARK: - Data Fetching
-//    func fetchTodaysData() {
-//        let calendar = Calendar.current
-//        let startOfDay = calendar.startOfDay(for: Date())
-//        let endOfDay = calendar.date(byAdding: .day, value: 1, to: startOfDay)!
-//        
-////        fetchStepCount(from: startOfDay, to: endOfDay) { [weak self] steps in
-//            DispatchQueue.main.async {
-//                self?.stepCount = steps
-//                self?.calculateCaloriesFromSteps(steps: steps)
-//            }
-//        }
-//        
-//        fetchDistance(from: startOfDay, to: endOfDay) { [weak self] distance in
-//            DispatchQueue.main.async {
-//                self?.distance = distance
-//            }
-//        }
-//    }
+    func fetchTodaysData() {
+        let calendar = Calendar.current
+        let startOfDay = calendar.startOfDay(for: Date())
+        let endOfDay = calendar.date(byAdding: .day, value: 1, to: startOfDay)!
+        
+        fetchStepCount(from: startOfDay, to: endOfDay) { [weak self] steps in
+            DispatchQueue.main.async {
+                self?.stepCount = steps
+                self?.calculateCaloriesFromSteps(steps: steps)
+            }
+        }
+        
+        fetchDistance(from: startOfDay, to: endOfDay) { [weak self] distance in
+            DispatchQueue.main.async {
+                self?.distance = distance
+            }
+        }
+    }
     
     func fetchStepCount() {
         guard let stepType = HKQuantityType.quantityType(forIdentifier: .stepCount) else { return }
@@ -348,26 +322,35 @@ class HealthKitManager: ObservableObject {
         
         healthStore.execute(query)
     }
-//    func fetchStepCount(from startDate: Date, to endDate: Date, completion: @escaping (Int) -> Void) {
-//        guard let stepCountType = HKQuantityType.quantityType(forIdentifier: .stepCount) else {
-//            completion(0)
-//            return
-//        }
-//        
-//        let predicate = HKQuery.predicateForSamples(withStart: startDate, end: endDate, options: .strictStartDate)
-//        
-//        let query = HKStatisticsQuery(quantityType: stepCountType, quantitySamplePredicate: predicate, options: .cumulativeSum) { _, result, error in
-//            guard let result = result, let sum = result.sumQuantity() else {
-//                completion(0)
-//                return
-//            }
-//            
-//            let steps = Int(sum.doubleValue(for: HKUnit.count()))
-//            completion(steps)
-//        }
-//        
-//        healthStore.execute(query)
-//    }
+    func fetchStepCount(from startDate: Date, to endDate: Date, completion: @escaping (Int) -> Void) {
+        guard let stepCountType = HKQuantityType.quantityType(forIdentifier: .stepCount) else {
+            print("❌ Could not create step count type")
+            completion(0)
+            return
+        }
+        
+        let predicate = HKQuery.predicateForSamples(withStart: startDate, end: endDate, options: .strictStartDate)
+        
+        let query = HKStatisticsQuery(quantityType: stepCountType, quantitySamplePredicate: predicate, options: .cumulativeSum) { _, result, error in
+            if let error = error {
+                print("❌ Error fetching step count: \(error.localizedDescription)")
+                completion(0)
+                return
+            }
+            
+            guard let result = result, let sum = result.sumQuantity() else {
+                print("⚠️ No step data found for period \(startDate) to \(endDate)")
+                completion(0)
+                return
+            }
+            
+            let steps = Int(sum.doubleValue(for: HKUnit.count()))
+            print("✅ Fetched \(steps) steps for period")
+            completion(steps)
+        }
+        
+        healthStore.execute(query)
+    }
     
     func fetchDistance(from startDate: Date, to endDate: Date, completion: @escaping (Double) -> Void) {
         guard let distanceType = HKQuantityType.quantityType(forIdentifier: .distanceWalkingRunning) else {
@@ -391,9 +374,12 @@ class HealthKitManager: ObservableObject {
     }
     
     func fetchWeeklySteps() {
+        print("🔄 Starting fetchWeeklySteps...")
         let calendar = Calendar.current
         let endDate = Date()
         let startDate = calendar.date(byAdding: .day, value: -6, to: endDate)!
+        
+        print("📅 Fetching steps from \(startDate) to \(endDate)")
         
         var dailySteps: [DailyStep] = []
         let group = DispatchGroup()
@@ -404,15 +390,21 @@ class HealthKitManager: ObservableObject {
             let startOfDay = calendar.startOfDay(for: date)
             let endOfDay = calendar.date(byAdding: .day, value: 1, to: startOfDay)!
             
-//            fetchStepCount(from: startOfDay, to: endOfDay) { steps in
-//                let dayName = calendar.shortWeekdaySymbols[calendar.component(.weekday, from: date) - 1]
-//                dailySteps.append(DailyStep(day: dayName, steps: steps, date: date))
-//                group.leave()
-//            }
+            fetchStepCount(from: startOfDay, to: endOfDay) { steps in
+                let dayName = calendar.shortWeekdaySymbols[calendar.component(.weekday, from: date) - 1]
+                let dailyStep = DailyStep(day: dayName, steps: steps, date: date)
+                dailySteps.append(dailyStep)
+                print("📊 \(dayName): \(steps) steps")
+                group.leave()
+            }
         }
         
         group.notify(queue: .main) {
             self.weeklySteps = dailySteps.sorted { $0.date < $1.date }
+            print("✅ Weekly steps updated: \(self.weeklySteps.count) days")
+            for step in self.weeklySteps {
+                print("   \(step.day): \(step.steps) steps")
+            }
         }
     }
     
@@ -452,7 +444,7 @@ class HealthKitManager: ObservableObject {
     
     // MARK: - Data Sync to Health App
     func updateWeightInHealthApp(weight: Double) {
-//        guard isAuthorized else { return }
+        guard isAuthorized else { return }
         
         let weightType = HKQuantityType.quantityType(forIdentifier: .bodyMass)!
         let weightQuantity = HKQuantity(unit: HKUnit.gramUnit(with: .kilo), doubleValue: weight)
@@ -471,7 +463,7 @@ class HealthKitManager: ObservableObject {
     }
     
     func updateHeightInHealthApp(height: Double) {
-//        guard isAuthorized else { return }
+        guard isAuthorized else { return }
         
         let heightType = HKQuantityType.quantityType(forIdentifier: .height)!
         let heightQuantity = HKQuantity(unit: HKUnit.meterUnit(with: .centi), doubleValue: height)
@@ -514,7 +506,7 @@ class HealthKitManager: ObservableObject {
 
     // MARK: - Live Sync: Observer + Anchored Queries
     private func startObservingHealthKitChanges() {
-//        guard isAuthorized else { return }
+        guard isAuthorized else { return }
 
         let stepType = HKObjectType.quantityType(forIdentifier: .stepCount)!
         let distanceType = HKObjectType.quantityType(forIdentifier: .distanceWalkingRunning)!
@@ -522,25 +514,24 @@ class HealthKitManager: ObservableObject {
         let heightType = HKObjectType.quantityType(forIdentifier: .height)!
 
         // Initial anchored fetch to establish anchors and sync UI
-//        runAnchoredFetch(for: stepType, anchorKey: anchorKeySteps)
-//        runAnchoredFetch(for: distanceType, anchorKey: anchorKeyDistance)
-//        runAnchoredFetch(for: weightType, anchorKey: anchorKeyWeight)
-//        runAnchoredFetch(for: heightType, anchorKey: anchorKeyHeight)
+        runAnchoredFetch(for: stepType, anchorKey: anchorKeySteps)
+        runAnchoredFetch(for: distanceType, anchorKey: anchorKeyDistance)
+        runAnchoredFetch(for: weightType, anchorKey: anchorKeyWeight)
+        runAnchoredFetch(for: heightType, anchorKey: anchorKeyHeight)
 
         // Set up observers
-//        setupObserver(for: stepType, anchorKey: anchorKeySteps)
-//        setupObserver(for: distanceType, anchorKey: anchorKeyDistance)
-//        setupObserver(for: weightType, anchorKey: anchorKeyWeight)
-//        setupObserver(for: heightType, anchorKey: anchorKeyHeight)
+        setupObserver(for: stepType, anchorKey: anchorKeySteps)
+        setupObserver(for: distanceType, anchorKey: anchorKeyDistance)
+        setupObserver(for: weightType, anchorKey: anchorKeyWeight)
+        setupObserver(for: heightType, anchorKey: anchorKeyHeight)
     }
 
-//    private func stopObservingHealthKitChanges() {
-//        for query in activeObserverQueries {
-//            healthStore.stop(query)
-//        }
-//        activeObserverQueries.removeAll()
-////        healthStore.disableAllBackgroundDelivery { _,_  in }
-//    }
+    private func stopObservingHealthKitChanges() {
+        for query in activeObserverQueries {
+            healthStore.stop(query)
+        }
+        activeObserverQueries.removeAll()
+    }
 
     private func setupObserver(for sampleType: HKSampleType, anchorKey: String) {
         let observer = HKObserverQuery(sampleType: sampleType, predicate: nil) { [weak self] _, completionHandler, error in
@@ -556,7 +547,7 @@ class HealthKitManager: ObservableObject {
         }
 
         healthStore.execute(observer)
-//        activeObserverQueries.append(observer)
+        activeObserverQueries.append(observer)
 
         // Enable background delivery
         healthStore.enableBackgroundDelivery(for: sampleType, frequency: .immediate) { success, error in
@@ -580,46 +571,46 @@ class HealthKitManager: ObservableObject {
                 self?.saveAnchor(newAnchor, forKey: anchorKey)
             }
 
-//            self?.handleUpdates(for: sampleType, newSamples: newSamples ?? [], deletedObjects: deletedObjects ?? [])
+            self?.handleUpdates(for: sampleType, newSamples: newSamples ?? [], deletedObjects: deletedObjects ?? [])
             completion?()
         }
 
         healthStore.execute(anchoredQuery)
     }
 
-//    private func handleUpdates(for sampleType: HKSampleType, newSamples: [HKSample], deletedObjects: [HKDeletedObject]) {
-//        DispatchQueue.main.async {
-//            if let quantityType = sampleType as? HKQuantityType {
-//                switch quantityType.identifier {
-//                case HKQuantityTypeIdentifier.stepCount.rawValue:
-////                    self.fetchTodaysData()
-//                    self.fetchWeeklySteps()
-//                case HKQuantityTypeIdentifier.distanceWalkingRunning.rawValue:
-////                    self.fetchTodaysData()
-//                case HKQuantityTypeIdentifier.bodyMass.rawValue:
-//                    self.fetchMostRecentSample(for: .bodyMass) { [weak self] sample in
-//                        if let sample = sample as? HKQuantitySample {
-//                            let weight = sample.quantity.doubleValue(for: HKUnit.gramUnit(with: .kilo))
-//                            DispatchQueue.main.async {
-//                                self?.userWeight = weight
-//                            }
-//                        }
-//                    }
-//                case HKQuantityTypeIdentifier.height.rawValue:
-//                    self.fetchMostRecentSample(for: .height) { [weak self] sample in
-//                        if let sample = sample as? HKQuantitySample {
-//                            let height = sample.quantity.doubleValue(for: HKUnit.meterUnit(with: .centi))
-//                            DispatchQueue.main.async {
-//                                self?.userHeight = height
-//                            }
-//                        }
-//                    }
-//                default:
-//                    break
-//                }
-//            }
-//        }
-//    }
+    private func handleUpdates(for sampleType: HKSampleType, newSamples: [HKSample], deletedObjects: [HKDeletedObject]) {
+        DispatchQueue.main.async {
+            if let quantityType = sampleType as? HKQuantityType {
+                switch quantityType.identifier {
+                case HKQuantityTypeIdentifier.stepCount.rawValue:
+                    self.fetchTodaysData()
+                    self.fetchWeeklySteps()
+                case HKQuantityTypeIdentifier.distanceWalkingRunning.rawValue:
+                    self.fetchTodaysData()
+                case HKQuantityTypeIdentifier.bodyMass.rawValue:
+                    self.fetchMostRecentSample(for: .bodyMass) { [weak self] sample in
+                        if let sample = sample as? HKQuantitySample {
+                            let weight = sample.quantity.doubleValue(for: HKUnit.gramUnit(with: .kilo))
+                            DispatchQueue.main.async {
+                                self?.userWeight = weight
+                            }
+                        }
+                    }
+                case HKQuantityTypeIdentifier.height.rawValue:
+                    self.fetchMostRecentSample(for: .height) { [weak self] sample in
+                        if let sample = sample as? HKQuantitySample {
+                            let height = sample.quantity.doubleValue(for: HKUnit.meterUnit(with: .centi))
+                            DispatchQueue.main.async {
+                                self?.userHeight = height
+                            }
+                        }
+                    }
+                default:
+                    break
+                }
+            }
+        }
+    }
 
     // MARK: - Anchor Persistence
     private func loadAnchor(forKey key: String) -> HKQueryAnchor? {

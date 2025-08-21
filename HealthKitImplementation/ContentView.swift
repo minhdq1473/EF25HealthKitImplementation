@@ -23,28 +23,28 @@ struct ContentView: View {
                 .tag(0)
             
             // Activity Tab
-//            ActivityView(healthKitManager: healthKitManager)
-//                .tabItem {
-//                    Image(systemName: "figure.walk")
-//                    Text("Activity")
-//                }
-//                .tag(1)
-//            
-//            // Goals Tab
-//            GoalsView(healthKitManager: healthKitManager)
-//                .tabItem {
-//                    Image(systemName: "target")
-//                    Text("Goals")
-//                }
-//                .tag(2)
-//            
-//            // Profile Tab
-//            ProfileView(healthKitManager: healthKitManager)
-//                .tabItem {
-//                    Image(systemName: "person.circle.fill")
-//                    Text("Profile")
-//                }
-//                .tag(3)
+            ActivityView(healthKitManager: healthKitManager)
+                .tabItem {
+                    Image(systemName: "figure.walk")
+                    Text("Activity")
+                }
+                .tag(1)
+            
+            // Goals Tab
+            GoalsView(healthKitManager: healthKitManager)
+                .tabItem {
+                    Image(systemName: "target")
+                    Text("Goals")
+                }
+                .tag(2)
+            
+            // Profile Tab
+            ProfileView(healthKitManager: healthKitManager)
+                .tabItem {
+                    Image(systemName: "person.circle.fill")
+                    Text("Profile")
+                }
+                .tag(3)
         }
         .accentColor(.blue)
     }
