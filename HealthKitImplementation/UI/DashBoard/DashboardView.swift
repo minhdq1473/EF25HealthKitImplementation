@@ -35,10 +35,6 @@ struct DashboardView: View {
                 .padding(.vertical)
             }
             .navigationTitle("Fitness Tracker")
-            .refreshable {
-                healthKitManager.fetchTodaysData()
-                healthKitManager.fetchWeeklySteps()
-            }
         }
     }
 }

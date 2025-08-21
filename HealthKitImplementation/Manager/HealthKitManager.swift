@@ -25,7 +25,6 @@ class HealthKitManager: ObservableObject {
     // User profile for calorie calculation
     @Published var userWeight: Double = 70.0 // kg
     @Published var userHeight: Double = 170.0 // cm
-    @Published var userAge: Int = 30
     @Published var userGender: HKBiologicalSex = .notSet
     
     // UserDefaults keys for persistent storage
@@ -219,21 +218,6 @@ class HealthKitManager: ObservableObject {
             }
         } catch {
             print("Error loading biological sex: \(error)")
-        }
-        
-        // Load user's date of birth
-        do {
-            let dateOfBirth = try healthStore.dateOfBirthComponents()
-            let now = Date()
-            let calendar = Calendar.current
-            if let birthDate = calendar.date(from: dateOfBirth) {
-                let age = calendar.dateComponents([.year], from: birthDate, to: now).year ?? 30
-                DispatchQueue.main.async {
-                    self.userAge = age
-                }
-            }
-        } catch {
-            print("Error loading date of birth: \(error)")
         }
         
         // Load most recent weight
@@ -482,19 +466,13 @@ class HealthKitManager: ObservableObject {
     }
     
     // Update user profile and sync to Health app
-    func updateUserProfile(weight: Double? = nil, height: Double? = nil, age: Int? = nil, gender: HKBiologicalSex? = nil) {
+    func updateUserProfile(weight: Double? = nil, height: Double? = nil, gender: HKBiologicalSex? = nil) {
         if let weight = weight {
             updateWeightInHealthApp(weight: weight)
         }
         
         if let height = height {
             updateHeightInHealthApp(height: height)
-        }
-        
-        if let age = age {
-            DispatchQueue.main.async {
-                self.userAge = age
-            }
         }
         
         if let gender = gender {
