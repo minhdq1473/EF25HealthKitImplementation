@@ -44,7 +44,7 @@ struct ActivityView: View {
             }
             .navigationTitle("Activity")
             .refreshable {
-                healthKitManager.fetchTodaysData()
+//                healthKitManager.fetchTodaysData()
                 healthKitManager.fetchWeeklySteps()
             }
         }
