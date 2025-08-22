@@ -38,7 +38,7 @@ struct SettingsSection: View {
                     subtitle: "Manage HealthKit access",
                     color: .red
                 ) {
-                    if let url = URL(string: "x-apple-health://") {
+                    if let url = URL(string: UIApplication.openSettingsURLString) {
                         UIApplication.shared.open(url)
                     }
                 }
@@ -55,18 +55,6 @@ struct SettingsSection: View {
                     if let url = URL(string: UIApplication.openSettingsURLString) {
                         UIApplication.shared.open(url)
                     }
-                }
-                
-                Divider()
-                    .padding(.leading, 50)
-                
-                SettingsRow(
-                    icon: "chart.bar.circle",
-                    title: "Data Export",
-                    subtitle: "Export your fitness data",
-                    color: .purple
-                ) {
-                    // Handle data export
                 }
             }
             .background(Color(.systemGray6))

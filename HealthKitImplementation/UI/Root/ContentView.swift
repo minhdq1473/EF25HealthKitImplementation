@@ -9,13 +9,13 @@ import SwiftUI
 import Charts
 
 struct ContentView: View {
-    @StateObject private var healthKitManager = HealthKitManager()
+    @EnvironmentObject var healthKitManager: HealthKitManager
     @State private var selectedTab = 0
     
     var body: some View {
         TabView(selection: $selectedTab) {
             // Dashboard Tab
-            DashboardView(healthKitManager: healthKitManager)
+            DashboardView()
                 .tabItem {
                     Image(systemName: "chart.bar.fill")
                     Text("Dashboard")
@@ -23,7 +23,7 @@ struct ContentView: View {
                 .tag(0)
             
             // Activity Tab
-            ActivityView(healthKitManager: healthKitManager)
+            ActivityView()
                 .tabItem {
                     Image(systemName: "figure.walk")
                     Text("Activity")
@@ -31,7 +31,7 @@ struct ContentView: View {
                 .tag(1)
             
             // Goals Tab
-            GoalsView(healthKitManager: healthKitManager)
+            GoalsView()
                 .tabItem {
                     Image(systemName: "target")
                     Text("Goals")
@@ -39,7 +39,7 @@ struct ContentView: View {
                 .tag(2)
             
             // Profile Tab
-            ProfileView(healthKitManager: healthKitManager)
+            ProfileView()
                 .tabItem {
                     Image(systemName: "person.circle.fill")
                     Text("Profile")

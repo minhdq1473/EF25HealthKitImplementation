@@ -23,8 +23,8 @@ class HealthKitManager: ObservableObject {
     @Published var errorMessage: String?
     
     // User profile for calorie calculation
-    @Published var userWeight: Double = 60 // kg
-    @Published var userHeight: Double = 170// cm
+    @Published var userWeight: Double = 0 // kg
+    @Published var userHeight: Double = 0// cm
     @Published var userGender: HKBiologicalSex = .notSet
     
     // UserDefaults keys for persistent storage
@@ -35,6 +35,7 @@ class HealthKitManager: ObservableObject {
     private let anchorKeyWeight = "HKAnchor_BodyMass"
     private let anchorKeyHeight = "HKAnchor_Height"
     
+    static let shared = HealthKitManager()
     init() {
         loadPersistedAuthorizationStatus()
     }
@@ -61,10 +62,12 @@ class HealthKitManager: ObservableObject {
                 self.needsAuthorization = false
                 self.errorMessage = nil
                 print("Loading with persisted authorization: granted")
-                self.loadUserProfile()
-                self.fetchTodaysData()
-                self.fetchWeeklySteps()
-                self.startObservingHealthKitChanges()
+                DispatchQueue.global().async {
+                    self.loadUserProfile()
+                    self.fetchTodaysData()
+                    self.fetchWeeklySteps()
+                    self.startObservingHealthKitChanges()
+                }
             } else if hasAttemptedAuth {
                 // User was asked before but didn't grant or denied
                 self.isAuthorized = false
@@ -80,54 +83,7 @@ class HealthKitManager: ObservableObject {
             }
         }
     }
-    
-    // Manual check for authorization status (only when user triggers it)
-    func checkCurrentAuthorizationStatus() {
-        guard HKHealthStore.isHealthDataAvailable() else {
-            DispatchQueue.main.async {
-                self.errorMessage = "HealthKit is not available on this device"
-                self.isAuthorized = false
-            }
-            return
-        }
-        
-        let stepCountType = HKObjectType.quantityType(forIdentifier: .stepCount)!
-        let authStatus = healthStore.authorizationStatus(for: stepCountType)
-        
-        DispatchQueue.main.async {
-            switch authStatus {
-            case .sharingAuthorized:
-                self.isAuthorized = true
-                self.needsAuthorization = false
-                self.errorMessage = nil
-                UserDefaults.standard.set(true, forKey: self.authorizationKey)
-                UserDefaults.standard.set(true, forKey: self.authorizationGrantedKey)
-                print("Manual check: authorization granted")
-                self.loadUserProfile()
-                self.fetchTodaysData()
-                self.fetchWeeklySteps()
-                self.startObservingHealthKitChanges()
-            case .sharingDenied:
-                self.isAuthorized = false
-                self.needsAuthorization = false
-                UserDefaults.standard.set(true, forKey: self.authorizationKey)
-                UserDefaults.standard.set(false, forKey: self.authorizationGrantedKey)
-                self.errorMessage = "Health access denied. Please enable in Settings > Privacy & Security > Health."
-                print("Manual check: authorization denied")
-            case .notDetermined:
-                self.isAuthorized = false
-                self.needsAuthorization = true
-                self.errorMessage = nil
-                print("Manual check: authorization not determined")
-            @unknown default:
-                self.isAuthorized = false
-                self.needsAuthorization = false
-                self.errorMessage = "Unknown authorization status."
-                print("Manual check: unknown status")
-            }
-        }
-    }
-    
+    // Refresh authorization status (manual check only)
     func requestAuthorization() {
         guard HKHealthStore.isHealthDataAvailable() else {
             DispatchQueue.main.async {
@@ -168,10 +124,14 @@ class HealthKitManager: ObservableObject {
                     self?.isAuthorized = true
                     self?.needsAuthorization = false
                     self?.errorMessage = nil
-                    self?.loadUserProfile()
-                    self?.fetchTodaysData()
-                    self?.fetchWeeklySteps()
-                    self?.startObservingHealthKitChanges()
+                    
+                    // Load data on background thread
+                    DispatchQueue.global(qos: .userInitiated).async {
+                        self?.loadUserProfile()
+                        self?.fetchTodaysData()
+                        self?.fetchWeeklySteps()
+                        self?.startObservingHealthKitChanges()
+                    }
                 } else {
                     let errorMsg = error?.localizedDescription ?? "Authorization failed. Please enable Health access in Settings."
                     print("HealthKit authorization failed: \(errorMsg)")
@@ -184,40 +144,19 @@ class HealthKitManager: ObservableObject {
             }
         }
     }
-    
-    // Refresh authorization status (manual check only)
-    func refreshAuthorizationStatus() {
-        checkCurrentAuthorizationStatus()
-    }
-    
-    // Reset authorization status (for testing/debugging)
-    func resetAuthorizationStatus() {
-        UserDefaults.standard.removeObject(forKey: authorizationKey)
-        UserDefaults.standard.removeObject(forKey: authorizationGrantedKey)
-        // Clear stored anchors and stop observers
-        UserDefaults.standard.removeObject(forKey: anchorKeySteps)
-        UserDefaults.standard.removeObject(forKey: anchorKeyDistance)
-        UserDefaults.standard.removeObject(forKey: anchorKeyWeight)
-        UserDefaults.standard.removeObject(forKey: anchorKeyHeight)
-        stopObservingHealthKitChanges()
-        DispatchQueue.main.async {
-            self.isAuthorized = false
-            self.needsAuthorization = true
-            self.errorMessage = nil
-            print("Authorization status reset - will show authorization request on next launch")
-        }
-    }
-    
     // MARK: - User Profile
     private func loadUserProfile() {
+        print("🔄 Loading user profile...")
+        
         // Load user's biological sex
         do {
             let biologicalSex = try healthStore.biologicalSex()
             DispatchQueue.main.async {
                 self.userGender = biologicalSex.biologicalSex
+                print("✅ Gender loaded: \(biologicalSex.biologicalSex)")
             }
         } catch {
-            print("Error loading biological sex: \(error)")
+            print("❌ Error loading biological sex: \(error)")
         }
         
         // Load most recent weight
@@ -226,6 +165,12 @@ class HealthKitManager: ObservableObject {
                 let weight = sample.quantity.doubleValue(for: HKUnit.gramUnit(with: .kilo))
                 DispatchQueue.main.async {
                     self?.userWeight = weight
+                    print("✅ Weight loaded: \(weight) kg")
+                }
+            } else {
+                print("⚠️ No weight data found")
+                DispatchQueue.main.async {
+                    self?.userWeight = 0
                 }
             }
         }
@@ -236,6 +181,12 @@ class HealthKitManager: ObservableObject {
                 let height = sample.quantity.doubleValue(for: HKUnit.meterUnit(with: .centi))
                 DispatchQueue.main.async {
                     self?.userHeight = height
+                    print("✅ Height loaded: \(height) cm")
+                }
+            } else {
+                print("⚠️ No height data found")
+                DispatchQueue.main.async {
+                    self?.userHeight = 0
                 }
             }
         }
@@ -243,6 +194,9 @@ class HealthKitManager: ObservableObject {
     
     private func fetchMostRecentSample(for identifier: HKQuantityTypeIdentifier, completion: @escaping (HKSample?) -> Void) {
         guard let sampleType = HKSampleType.quantityType(forIdentifier: identifier) else {
+            DispatchQueue.main.async {
+                self.errorMessage = "Could not create most recent sample"
+            }
             completion(nil)
             return
         }
@@ -276,7 +230,12 @@ class HealthKitManager: ObservableObject {
     }
     
     func fetchStepCount() {
-        guard let stepType = HKQuantityType.quantityType(forIdentifier: .stepCount) else { return }
+        guard let stepType = HKQuantityType.quantityType(forIdentifier: .stepCount) else {
+            DispatchQueue.main.async {
+                self.errorMessage = "Could not create step count"
+            }
+            return
+        }
         
         DispatchQueue.main.async {
             self.isFetching = true
@@ -296,6 +255,9 @@ class HealthKitManager: ObservableObject {
                 
                 if let error = error {
                     print("Lỗi khi lấy dữ liệu bước chân: \(error.localizedDescription)")
+                    DispatchQueue.main.async {
+                        self?.errorMessage = error.localizedDescription
+                    }
                     return
                 }
                 
@@ -309,6 +271,7 @@ class HealthKitManager: ObservableObject {
     func fetchStepCount(from startDate: Date, to endDate: Date, completion: @escaping (Int) -> Void) {
         guard let stepCountType = HKQuantityType.quantityType(forIdentifier: .stepCount) else {
             print("Could not create step count type")
+            self.errorMessage = "Could not fetch step count"
             completion(0)
             return
         }
@@ -319,12 +282,17 @@ class HealthKitManager: ObservableObject {
             if let error = error {
                 print("Error fetching step count: \(error.localizedDescription)")
                 completion(0)
+                DispatchQueue.main.async {
+                    self.errorMessage = "Could not fetch step count"
+                }
                 return
             }
-            
             guard let result = result, let sum = result.sumQuantity() else {
                 print("No step data found for period \(startDate) to \(endDate)")
                 completion(0)
+                DispatchQueue.main.async {
+                    self.errorMessage = error?.localizedDescription ?? "Unknown error"
+                }
                 return
             }
             
@@ -338,6 +306,7 @@ class HealthKitManager: ObservableObject {
     
     func fetchDistance(from startDate: Date, to endDate: Date, completion: @escaping (Double) -> Void) {
         guard let distanceType = HKQuantityType.quantityType(forIdentifier: .distanceWalkingRunning) else {
+            self.errorMessage = "Could not create distance type"
             completion(0)
             return
         }
@@ -346,10 +315,12 @@ class HealthKitManager: ObservableObject {
         
         let query = HKStatisticsQuery(quantityType: distanceType, quantitySamplePredicate: predicate, options: .cumulativeSum) { _, result, error in
             guard let result = result, let sum = result.sumQuantity() else {
+                if let error = error {
+                    print("Error fetching distance: \(error.localizedDescription)")
+                }
                 completion(0)
                 return
             }
-            
             let distance = sum.doubleValue(for: HKUnit.meterUnit(with: .kilo))
             completion(distance)
         }
@@ -385,7 +356,7 @@ class HealthKitManager: ObservableObject {
         
         group.notify(queue: .main) {
             self.weeklySteps = dailySteps.sorted { $0.date < $1.date }
-            print("✅ Weekly steps updated: \(self.weeklySteps.count) days")
+            print("Weekly steps updated: \(self.weeklySteps.count) days")
             for step in self.weeklySteps {
                 print("   \(step.day): \(step.steps) steps")
             }
@@ -479,6 +450,19 @@ class HealthKitManager: ObservableObject {
             DispatchQueue.main.async {
                 self.userGender = gender
             }
+        }
+    }
+    
+    // Force refresh user profile data from HealthKit
+    func refreshUserProfile() {
+        guard isAuthorized else {
+            print("❌ Cannot refresh profile - not authorized")
+            return
+        }
+        
+        print("🔄 Force refreshing user profile...")
+        DispatchQueue.global(qos: .userInitiated).async {
+            self.loadUserProfile()
         }
     }
 

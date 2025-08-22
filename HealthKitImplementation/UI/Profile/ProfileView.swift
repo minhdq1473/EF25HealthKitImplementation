@@ -9,7 +9,7 @@ import SwiftUI
 import HealthKit
 
 struct ProfileView: View {
-    @ObservedObject var healthKitManager: HealthKitManager
+    @EnvironmentObject var healthKitManager: HealthKitManager
     @State private var showingEditProfile = false
     
     var body: some View {
@@ -42,6 +42,6 @@ struct ProfileView: View {
     }
 }
 
-#Preview {
-    ProfileView(healthKitManager: HealthKitManager())
-}
+//#Preview {
+//    ProfileView(healthKitManager: HealthKitManager())
+//}

@@ -27,22 +27,38 @@ struct ErrorMessageView: View {
                 .foregroundColor(.secondary)
                 .font(.subheadline)
                 .padding(.horizontal)
-            
+                
             Button(action: {
-                healthKitManager.refreshAuthorizationStatus()
+                openSettings()
             }) {
-                Text("Refresh Status")
-                    .font(.subheadline)
-                    .foregroundColor(.blue)
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(Color.blue.opacity(0.1))
-                    .cornerRadius(12)
+                HStack {
+                    Image(systemName: "gear")
+                    Text("Go to Settings")
+                }
+                .font(.subheadline)
+                .foregroundColor(.white)
+                .frame(maxWidth: .infinity)
+                .padding()
+                .background(Color.orange)
+                .cornerRadius(12)
             }
         }
         .padding()
         .background(Color(.systemGray6))
         .cornerRadius(16)
         .padding(.horizontal)
+    }
+    
+    // MARK: - Private Methods
+    private func openSettings() {
+        guard let settingsUrl = URL(string: UIApplication.openSettingsURLString) else {
+            return
+        }
+        
+        if UIApplication.shared.canOpenURL(settingsUrl) {
+            UIApplication.shared.open(settingsUrl, completionHandler: { (success) in
+                print("Settings opened: \(success)")
+            })
+        }
     }
 }

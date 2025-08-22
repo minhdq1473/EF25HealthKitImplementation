@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct GoalsView: View {
-    @ObservedObject var healthKitManager: HealthKitManager
+    @EnvironmentObject var healthKitManager: HealthKitManager
     @State private var stepGoal: Double = 10000
     @State private var calorieGoal: Double = 400
     @State private var distanceGoal: Double = 10
@@ -95,6 +95,6 @@ struct GoalsView: View {
     }
 }
 
-#Preview {
-    GoalsView(healthKitManager: HealthKitManager())
-}
+//#Preview {
+//    GoalsView(healthKitManager: HealthKitManager())
+//}

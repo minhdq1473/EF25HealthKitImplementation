@@ -9,7 +9,7 @@ import Foundation
 import SwiftUI
 
 struct DashboardView: View {
-    @ObservedObject var healthKitManager: HealthKitManager
+    @EnvironmentObject var healthKitManager: HealthKitManager
     
     var body: some View {
         NavigationView {
@@ -19,18 +19,18 @@ struct DashboardView: View {
                     
                     if healthKitManager.needsAuthorization {
                         AuthorizationRequestView(healthKitManager: healthKitManager)
-                    }
-                    
-                    if let errorMessage = healthKitManager.errorMessage, !healthKitManager.needsAuthorization {
-                        ErrorMessageView(errorMessage: errorMessage, healthKitManager: healthKitManager)
-                    }
-                    
-                    if healthKitManager.isAuthorized {
+                    } else if healthKitManager.errorMessage == nil {
                         MetricsGridView(healthKitManager: healthKitManager)
                         
                         WeeklyStepsChart(healthKitManager: healthKitManager)
                             .padding(.horizontal)
                     }
+
+                    
+                    if let errorMessage = healthKitManager.errorMessage {
+                        ErrorMessageView(errorMessage: errorMessage, healthKitManager: healthKitManager)
+                    }
+                    
                 }
                 .padding(.vertical)
             }
