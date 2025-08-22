@@ -22,15 +22,6 @@ struct ActivityView: View {
         NavigationView {
             ScrollView {
                 VStack(spacing: 24) {
-                    // Time Range Picker
-                    Picker("Time Range", selection: $selectedTimeRange) {
-                        ForEach(TimeRange.allCases, id: \.self) { range in
-                            Text(range.rawValue).tag(range)
-                        }
-                    }
-                    .pickerStyle(SegmentedPickerStyle())
-                    .padding(.horizontal)
-                    
                     // Activity Summary Cards
                     ActivitySummarySection(healthKitManager: healthKitManager)
                     

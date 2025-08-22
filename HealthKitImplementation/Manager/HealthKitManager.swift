@@ -23,8 +23,8 @@ class HealthKitManager: ObservableObject {
     @Published var errorMessage: String?
     
     // User profile for calorie calculation
-    @Published var userWeight: Double = 70.0 // kg
-    @Published var userHeight: Double = 170.0 // cm
+    @Published var userWeight: Double = 60 // kg
+    @Published var userHeight: Double = 170// cm
     @Published var userGender: HKBiologicalSex = .notSet
     
     // UserDefaults keys for persistent storage
@@ -308,7 +308,7 @@ class HealthKitManager: ObservableObject {
     }
     func fetchStepCount(from startDate: Date, to endDate: Date, completion: @escaping (Int) -> Void) {
         guard let stepCountType = HKQuantityType.quantityType(forIdentifier: .stepCount) else {
-            print("❌ Could not create step count type")
+            print("Could not create step count type")
             completion(0)
             return
         }
@@ -317,19 +317,19 @@ class HealthKitManager: ObservableObject {
         
         let query = HKStatisticsQuery(quantityType: stepCountType, quantitySamplePredicate: predicate, options: .cumulativeSum) { _, result, error in
             if let error = error {
-                print("❌ Error fetching step count: \(error.localizedDescription)")
+                print("Error fetching step count: \(error.localizedDescription)")
                 completion(0)
                 return
             }
             
             guard let result = result, let sum = result.sumQuantity() else {
-                print("⚠️ No step data found for period \(startDate) to \(endDate)")
+                print("No step data found for period \(startDate) to \(endDate)")
                 completion(0)
                 return
             }
             
             let steps = Int(sum.doubleValue(for: HKUnit.count()))
-            print("✅ Fetched \(steps) steps for period")
+            print("Fetched \(steps) steps for period")
             completion(steps)
         }
         

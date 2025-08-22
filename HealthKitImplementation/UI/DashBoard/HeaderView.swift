@@ -20,13 +20,6 @@ struct HeaderView: View {
                     .foregroundColor(.secondary)
             }
             Spacer()
-            Button(action: {
-                healthKitManager.fetchTodaysData()
-            }) {
-                Image(systemName: "arrow.clockwise")
-                    .font(.title2)
-                    .foregroundColor(.blue)
-            }
         }
         .padding(.horizontal)
     }

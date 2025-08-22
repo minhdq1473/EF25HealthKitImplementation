@@ -24,9 +24,6 @@ struct ProfileView: View {
                     
                     // Settings
                     SettingsSection(showingEditProfile: $showingEditProfile)
-                    
-                    // App Info
-                    AppInfoSection()
                 }
                 .padding(.vertical)
             }
